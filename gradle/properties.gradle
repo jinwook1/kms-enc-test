@@ -1,0 +1,54 @@
+try {
+    loadProperties(file("${project.rootDir}/local.properties"))
+} catch (ignored) {}
+
+def loadProperties(file) {
+    def properties = new Properties()
+    properties.load(file.newReader())
+    properties.forEach((k, v) ->{
+        project.ext.setProperty(k, v)
+    })
+}
+
+def readProperty(propertyName) {
+    return project.hasProperty(propertyName) ? project.getProperty(propertyName) : ''
+}
+
+def getCurrentGitBranch() {
+    def gitBranch = ''
+    try {
+        def workingDir = new File("${project.projectDir}")
+        def result = 'git rev-parse HEAD'.execute(null, workingDir)
+        result.waitFor()
+        def headHash = result.text.trim()
+        println("headHash : " + headHash)
+        result = ('git describe --all ' + headHash).execute(null, workingDir)
+        result.waitFor()
+        if (result.exitValue() == 0) {
+            gitBranch = result.text.trim().replace('heads/', '').
+                    replace('remotes/origin/', '').replace('/', '-').replace('master', '').replace('main', '')
+            if (gitBranch.length() != 0) {
+                gitBranch = '-' + gitBranch
+            }
+        }
+    } catch (ignored) {
+    }
+    return gitBranch
+}
+
+def getVersion(baseVersion, propertyName) {
+    def branch_name = readProperty(propertyName) == null ? '' : readProperty(propertyName)
+    if (branch_name.length() > 0) {
+        branch_name = branch_name.replace('/', '-').replace('master', '').replace('main', '')
+        branch_name = branch_name.length() > 0 ? '-' + branch_name : branch_name
+        return baseVersion + branch_name
+    } else {
+        return baseVersion + getCurrentGitBranch()
+    }
+}
+
+ext {
+    getVersion = this.&getVersion
+    readProperty = this.&readProperty
+    loadProperties = this.&loadProperties
+}
